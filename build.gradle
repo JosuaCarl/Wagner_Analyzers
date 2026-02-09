@@ -1,0 +1,37 @@
+
+plugins {
+    // Apply the groovy plugin to add support for Groovy
+    id 'idea'
+    id 'java'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+idea {
+    module.inheritOutputDirs = true
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://jitpack.io' }
+    maven { url = 'https://mvnrepository.com/repos/scijava-public'}
+}
+
+configurations {}
+
+sourceSets {
+    main.java.srcDirs = ['src/main']
+    main.resources.srcDirs = ['src/resources']
+}
+
+String imageJVersion = '2.17.0'
+
+dependencies {// Source: https://mvnrepository.com/artifact/net.imagej/imagej
+    //implementation("net.imagej:imagej:$imageJVersion")
+    // Source: https://mvnrepository.com/artifact/net.imagej/ij
+    implementation group: 'net.imagej', name: 'ij', version: '1.54p'
+}

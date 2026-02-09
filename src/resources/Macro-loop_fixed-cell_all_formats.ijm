@@ -32,7 +32,7 @@ function processFolder(inpath, outpath, previous_path) {
 			processFolder(inpath + File.separator + list[i], outpath, previous_path + File.separator + list[i]);
 		
 		if(endsWith(list[i], suffix))
-			processFile(previous_path, inpath, output, list[i]);
+			processFile(previous_path, inpath, outputDirectory, list[i]);
 	}
 }
 
@@ -44,9 +44,9 @@ function processFile(previous_path, input, output, file) {
 	print("Processing: " + filepath);
 	run("Bio-Formats Importer", "open=["+ filepath + "] color_mode=Default view=Hyperstack stack_order=XYCZT");
 
-	getDimensions (imageWidth, imageHeight, channels, slices, frames);
+	getDimensions(imageWidth, imageHeight, channels, slices, frames);
 	if (frames == 1 && slices == 1) {
-		image_analysis(previous_path, input, output, file, filepath, outpath, channels);
+		image_analysis(previous_path, input, output, file, filepath, outpath, channels, true);
 	}
 	else if (slices == 1){
 		video_analysis(previous_path, input, output, file, filepath, outpath, channels);
@@ -62,9 +62,16 @@ function processFile(previous_path, input, output, file) {
 
 // 			ANALYSIS PIPELINE FUNCTIONS 			//
 
-function image_analysis(previous_path, input, output, file, filepath, outpath, channels) {
-	// function for image analysis 	
-	merges = common_analysis_steps(channels);
+function image_analysis(previous_path, input, output, file, filepath, outpath, channels, withCommon) {
+	// function for image analysis
+	if(withCommon) {
+		merges = common_analysis_steps(channels);
+	}
+	else {
+		split_channels();
+		file = add_file_suffix(file, "-1")
+		merges = separate_by_color(channels, file);
+	}
 
 	// Save merge
 	merge_composition(merges);
@@ -74,8 +81,11 @@ function image_analysis(previous_path, input, output, file, filepath, outpath, c
 	color_names = newArray("RR", "AF", "DAPI", "Ph2");
 	for (i = 0; i < merges.length; i++) {
 		save_tiff(merges[i], outpath, color_names[i]);
+		selectImage(merges[i]);	
+		run("RGB Color");
+		run("Grays");
+		save_tiff(merges[i], outpath, color_names[i] + "_gray");
 	}
-	
 	
 	close("*");
 }
@@ -107,52 +117,62 @@ function video_analysis(previous_path, input, output, file, filepath, outpath, c
 
 
 function z_stack_analysis(previous_path, input, output, file, filepath, outpath, channels) {
-	// function for z-stack analysis
-	merges = common_analysis_steps(channels);
-
-	projection_types = newArray("Z Project", "3D Project");
+	projection_types = newArray("Z Project", "3D Project", "Select Z-level");
 	Dialog.create("How should the stack be projected ?");
 	Dialog.addChoice("Projection Type:", projection_types, "Z Project");
 	Dialog.show();
 	projection_type = Dialog.getChoice();
 
-	for (i = 0; i < merges.length; i++) {
-		selectWindow(merges[i]);
-		
-		if (projection_type == "Z Project") {
-			run("Z Project...", "projection=[Max Intensity]");
-			merges[i] = "MAX_"+ merges[i];
-		}
-		else if (projection_type == "3D Project") {
-			run("3D Project...", "projection=[Brightest Point] axis=Y-Axis slice=0.20 initial=0 total=360 rotation=10 lower=1 upper=255 opacity=0 surface=100 interior=50 interpolate");
-			merges[i] = "Projections of "+ merges[i];
-		}		
+	if (projection_type == "Select Z-level") {
+		bg_adjust();
+		crop();
+		scale_bar();
+		run("Make Substack...");
+		selectImage(1);
+		image_analysis(previous_path, input, output, file, filepath, outpath, channels, false);
 	}
+	else {
+		// function for z-stack analysis
+		merges = common_analysis_steps(channels);
 
-	
-	// Save merge
-	merge_composition(merges);
-	if (projection_type == "Z Project") {
-		save_tiff("Composite", outpath, "Merge");
-	}
-	else if (projection_type == "3D Project") {
-		Dialog.create("Saving options");
-		Dialog.addString("Frames per second:", 5);
-		Dialog.show();
-		frames = Dialog.getString();
+		for (i = 0; i < merges.length; i++) {
+			selectWindow(merges[i]);
+			
+			if (projection_type == "Z Project") {
+				run("Z Project...", "projection=[Max Intensity]");
+				merges[i] = "MAX_"+ merges[i];
+			}
+			else if (projection_type == "3D Project") {
+				run("3D Project...", "projection=[Brightest Point] axis=Y-Axis slice=0.20 initial=0 total=360 rotation=10 lower=1 upper=255 opacity=0 surface=100 interior=50 interpolate");
+				merges[i] = "Projections of "+ merges[i];
+			}		
+		}
+
 		
-		save_avi("Composite", outpath, "Merge", frames);
-	}
-	
-	// Save single channels
-	color_names = newArray("TMR", "GFP", "Hoechst", "Ph2");
-	for (i = 0; i < merges.length; i++) {
+		// Save merge
+		merge_composition(merges);
 		if (projection_type == "Z Project") {
-			save_tiff(merges[i], outpath, color_names[i]);
+			save_tiff("Composite", outpath, "Merge");
 		}
 		else if (projection_type == "3D Project") {
-			save_avi(merges[i], outpath, color_names[i], frames);
+			Dialog.create("Saving options");
+			Dialog.addString("Frames per second:", 5);
+			Dialog.show();
+			frames = Dialog.getString();
+			
+			save_avi("Composite", outpath, "Merge", frames);
 		}
+		
+		// Save single channels
+		color_names = newArray("TMR", "GFP", "Hoechst", "Ph2");
+		for (i = 0; i < merges.length; i++) {
+			if (projection_type == "Z Project") {
+				save_tiff(merges[i], outpath, color_names[i]);
+			}
+			else if (projection_type == "3D Project") {
+				save_avi(merges[i], outpath, color_names[i], frames);
+			}	
+		}	
 	}	
 
 	close("*");
@@ -164,12 +184,19 @@ function z_stack_analysis(previous_path, input, output, file, filepath, outpath,
 
 // 			PRINCIPAL HELPER FUNCTIONS 			//
 
+function add_file_suffix(file, suffix) {
+	nameSplit = split(file, ".");
+	name = String.join(Array.slice(nameSplit, 0, nameSplit.length-1), ".");
+	ending = nameSplit[nameSplit.size() - 1]; // selector does not work
+	return name + suffix + ending;
+}
+
 function common_analysis_steps(channels) {
 	bg_adjust();
 	crop();
 	scale_bar();
 	split_channels();
-	merges = separate_by_color(channels);
+	merges = separate_by_color(channels, file);
 
 	return merges;
 }
@@ -202,7 +229,7 @@ function split_channels() {
 }
 
 
-function separate_by_color(num_channels) { 
+function separate_by_color(num_channels, file) { 
 	// Separate channels by color
 	merges = newArray(num_channels);
 	for (i = 1; i <= num_channels; i++) {
