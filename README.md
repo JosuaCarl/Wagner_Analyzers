@@ -1,4 +1,4 @@
-# Image-Z-Stack-and-Video-analysisis-with-Fiji
+# Wagner Analyzers (image, Z-Stack and video analysis with Fiji workflow)
 
 A script that navigates through folders and subfolders of a starting point, miming the folder structure at a given output path, and opening all files with a defined suffix for further analysis. The analysis separates java input into separate channels, merges and saves them with a naming scheme that can be adjusted in the code. The script detects automatically, whether the given file is a image, z-stack or video and will adjust analysis accordingly. Just try it out on your java images and see the magic happen.
 
