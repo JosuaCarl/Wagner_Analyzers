@@ -30,3 +30,6 @@ gradle*
 # IntelliJ
 .idea/
 
+# Trash
+dumpsterfire/
+
