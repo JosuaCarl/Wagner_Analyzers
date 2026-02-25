@@ -338,6 +338,8 @@ public class Stepwise_Analyzer implements PlugIn {
         RGBStackMerge rgbStackMerge = new RGBStackMerge();
         ImagePlus composite = rgbStackMerge.mergeHyperstacks(rgb, true);
 
+        // TODO: only add RGB, excluding grayscale
+
         log("Showing composite: " + composite.getTitle());
         composite.show();
 

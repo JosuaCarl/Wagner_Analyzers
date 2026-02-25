@@ -11,7 +11,7 @@
 
     <groupId>sc.fiji</groupId>
     <artifactId>Wagner_Analyzers</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
 
     <name>Wagner_Analyzers</name>
     <description>Analyzers for the Wagner Group.</description>

@@ -7,6 +7,10 @@ import java.util.Vector;
 import ij.*;
 import ij.gui.*;
 
+/**
+ * Open a non-blocking window to interact with the ROI by hand and specification.
+ * In large parts inspired by (Specify_ROI_Interactively)[https://imagej.net/ij/plugins/specify-roi-interactively/Specify_ROI_Interactively.java].
+ */
 public class SpecifyROI_Interactively implements PlugIn, DialogListener, RoiListener, MouseListener {
     private Roi previousRoi;
     private ImagePlus image;
