@@ -35,11 +35,13 @@ public class Stepwise_Analyzer implements PlugIn {
     }
 
     public void run(String arg){
+        log("Starting run.");
         Path inputDirectory = Paths.get( IJ.getDirectory("Choose input directory") ).normalize().toAbsolutePath();
         Path outputDirectory = Paths.get( IJ.getDirectory("Choose output directory") ).normalize().toAbsolutePath();
         String fileSuffix = IJ.getString("File suffix", ".nd2");
 
         processFolder(inputDirectory, outputDirectory, fileSuffix);
+        log("Run complete.");
     }
 
     /**
@@ -76,6 +78,8 @@ public class Stepwise_Analyzer implements PlugIn {
         } catch (IOException e){
             throw new RuntimeException(e);
         }
+
+        log("Finished processing.");
     }
 
     public static void processFile(Path inFile, Path outFolder) throws IOException {

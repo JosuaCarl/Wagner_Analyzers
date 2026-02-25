@@ -11,7 +11,7 @@
 
     <groupId>sc.fiji</groupId>
     <artifactId>Wagner_Analyzers</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 
     <name>Wagner_Analyzers</name>
     <description>Analyzers for the Wagner Group.</description>
@@ -96,12 +96,40 @@
             <artifactId>imagej</artifactId>
             <version>2.17.0</version>
             <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.python</groupId>
+                    <artifactId>jython-slim</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.github.jnr</groupId>
+                    <artifactId>jnr-ffi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.scala-lang.modules</groupId>
+                    <artifactId>scala-asm</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>loci</groupId>
             <artifactId>loci_plugins</artifactId>
             <version>4.4.9</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>net.imagej</groupId>
+                    <artifactId>ij</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>edu.ucar</groupId>
+                    <artifactId>netcdf</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>xalan</groupId>
+                    <artifactId>xalan</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
