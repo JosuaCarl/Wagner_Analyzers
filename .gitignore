@@ -33,3 +33,6 @@ gradle*
 # Trash
 dumpsterfire/
 
+# Test output
+src/test/resources/out/*
+
