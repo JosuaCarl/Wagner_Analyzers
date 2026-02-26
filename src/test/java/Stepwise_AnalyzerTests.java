@@ -1,3 +1,4 @@
+import ij.IJ;
 import ij.ImagePlus;
 import loci.formats.FormatException;
 import loci.plugins.LociImporter;
@@ -12,29 +13,42 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class Stepwise_AnalyzerTests {
+    Stepwise_Analyzer stepwiseAnalyzer = new Stepwise_Analyzer();
+
     public static void main(String[] args) throws IOException, FormatException {
         ImageJ ij = new ImageJ();
         ij.ui().showUI();
 
-        testSingleFile(Paths.get("src/test/resources/FluorescentCells.nd2").toAbsolutePath());
+        Stepwise_AnalyzerTests stepwiseAnalyzerTests = new Stepwise_AnalyzerTests();
+        stepwiseAnalyzerTests.testSingleFile(
+                Paths.get("src/test/resources/Rat_Hippocampal_Neuron.tif").toAbsolutePath(),
+                "Default"
+        );
+
     }
 
-    private static ImagePlus[] bioImportImage(Path inFile) throws IOException, FormatException {
-        // IJ.run("Bio-Formats Importer", "open=["+ inFile + "] color_mode=Default view=Hyperstack stack_order=XYCZT");
-        LociImporter lociImporter = new LociImporter();
-        Importer importer = new Importer(lociImporter);
-        ImporterOptions options = importer.parseOptions("open=[" + inFile.toString() + "] color_mode=Composite view=Hyperstack stack_order=XYCZT");
-        ImportProcess importProcess = new ImportProcess(options);
-        importProcess.execute();
-        ImagePlusReader imagePlusReader = new ImagePlusReader(importProcess);
-        return imagePlusReader.openImagePlus();
+    private ImagePlus[] bioImportImage(Path inFile, String colorMode) throws IOException, FormatException {
+
+        ImagePlus[] image = {IJ.openImage(inFile.toString())};
+        if (image[0] == null) {
+            // IJ.run("Bio-Formats Importer", "open=["+ inFile + "] color_mode=Default view=Hyperstack stack_order=XYCZT");
+            LociImporter lociImporter = new LociImporter();
+            Importer importer = new Importer(lociImporter);
+            ImporterOptions options = importer.parseOptions("open=[" + inFile.toString() + "] color_mode=" + colorMode + " view=Hyperstack stack_order=XYCZT");
+            ImportProcess importProcess = new ImportProcess(options);
+            importProcess.execute();
+            ImagePlusReader imagePlusReader = new ImagePlusReader(importProcess);
+
+            image = imagePlusReader.openImagePlus();
+        }
+        return image;
     }
 
-    private static boolean testSingleFile(Path inFile) throws IOException, FormatException {
-        ImagePlus image = bioImportImage(inFile)[0];
+    private boolean testSingleFile(Path inFile, String colorMode) throws IOException, FormatException {
+        ImagePlus image = bioImportImage(inFile, colorMode)[0];
         image.show();
 
-        Stepwise_Analyzer.processImage( image, Paths.get("src/test/resources/out").toAbsolutePath() );
+        stepwiseAnalyzer.processImage( image, Paths.get("src/test/resources/out").toAbsolutePath() );
 
         return true;
     }

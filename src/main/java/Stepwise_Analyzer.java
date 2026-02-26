@@ -1,98 +1,15 @@
 import ij.*;
 import ij.gui.GenericDialog;
 import ij.plugin.*;
-import ij.plugin.filter.AVI_Writer;
-import ij.plugin.frame.ContrastAdjuster;
 
 import net.imagej.ImageJ;
 
-import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-public class Stepwise_Analyzer implements PlugIn {
+public class Stepwise_Analyzer implements PlugIn, ImageAnalyzer {
 
-    //
-    // Runner methods
-    //
-    protected static void log(String message) {
-        System.out.println(message);
-        IJ.log(message);
-    }
-
-    public static void main(String[] args) {
-        ImageJ ij = new ImageJ();
-        ij.ui().showUI();
-
-        (new Stepwise_Analyzer()).run("");
-    }
-
-    public void run(String arg){
-        log("Starting run.");
-        Path inputDirectory = Paths.get( IJ.getDirectory("Choose input directory") ).normalize().toAbsolutePath();
-        Path outputDirectory = Paths.get( IJ.getDirectory("Choose output directory") ).normalize().toAbsolutePath();
-        String fileSuffix = IJ.getString("File suffix", ".nd2");
-
-        processFolder(inputDirectory, outputDirectory, fileSuffix);
-        log("Run complete.");
-    }
-
-    /**
-     * Function to analyze files in a folder and mirror the results into an output directory.
-     *
-     * @param inFolder Input folder
-     * @param outFolder Output folder
-     */
-    public static void processFolder(Path inFolder, Path outFolder, String fileSuffix) {
-        // function to scan folders/subfolders/files to find files with correct suffix
-        try (Stream<Path> entries = Files.list(inFolder)) {
-            for(Path entry : entries.collect(Collectors.toList())) {
-                log("Checking out folder: " + entry.toString());
-                if( Files.isDirectory(entry) && !entry.equals(outFolder)) {
-                    Path newOutFolder = outFolder.resolve(entry.getFileName());
-                    try {
-                        log("Creating folder " + newOutFolder);
-                        Files.createDirectory( newOutFolder );
-                    } catch (IOException e) {
-                        if (e instanceof FileAlreadyExistsException) {
-                            log("Folder " + newOutFolder + " already exists.");
-                        } else {
-                            throw new RuntimeException(e);
-                        }
-                    }
-
-                    processFolder(entry, newOutFolder, fileSuffix);
-                }
-
-                if( entry.getFileName().toString().endsWith(fileSuffix) ) {
-                    processFile(entry, outFolder);
-                }
-            }
-        } catch (IOException e){
-            throw new RuntimeException(e);
-        }
-
-        log("Finished processing.");
-    }
-
-    public static void processFile(Path inFile, Path outFolder) throws IOException {
-        log("Processing: " + inFile);
-
-        // Import
-        ImagePlus image = IJ.openImage( inFile.toString() );
-        image.show();
-
-        processImage(image, outFolder);
-    }
-
-    public static void processImage(ImagePlus image, Path outFolder) {
+    public void processImage(ImagePlus image, Path outFolder) {
         int[] dimensions = image.getDimensions();
 
         // dimensions = [width, height, channels, slices, frames]
@@ -100,15 +17,15 @@ public class Stepwise_Analyzer implements PlugIn {
         int frames = dimensions[4];
 
         if (frames == 1 && slices == 1) {
-            log("Detected image");
+            Logger.log("Detected image");
             imageAnalysis(image, outFolder, true);
         }
         else if (slices == 1){
-            log("Detected video");
+            Logger.log("Detected video");
             videoAnalysis(image, outFolder);
         }
         else {
-            log("Detected z-stack");
+            Logger.log("Detected z-stack");
             zStackAnalysis(image, outFolder);
         }
 
@@ -124,30 +41,30 @@ public class Stepwise_Analyzer implements PlugIn {
     Analysis steps
      */
 
-    public static void imageAnalysis(ImagePlus image, Path outFolder, boolean withCommon) {
-        log("Starting single image analysis...");
+    public void imageAnalysis(ImagePlus image, Path outFolder, boolean withCommon) {
+        Logger.log("Starting single image analysis...");
 
-        ImagePlus[] rgbs = withCommon ?  commonAnalysisSteps(image) : separateRGB(image);
+        ImagePlus[] rgbs = withCommon ?  commonAnalysisSteps(image) : ImageChanger.separateRGB(image);
 
         // Save merge
-        ImagePlus composite = mergeRGB(rgbs);
-        save_tif(composite, outFolder, "Merge");
+        ImagePlus composite = ImageChanger.mergeRGB(rgbs);
+        ImageChanger.save_tif(composite, outFolder, "Merge");
 
         // Save single files
         String[] colorNamesImage = {"RR", "AF", "DAPI", "Ph2"};
 
         for (int i = 0; i < rgbs.length; i++) {
             ImagePlus rgbImage = rgbs[i];
-            save_tif(rgbImage, outFolder, colorNamesImage[i]);
+            ImageChanger.save_tif(rgbImage, outFolder, colorNamesImage[i]);
 
-            ImagePlus greyImage = toGrey(rgbImage);
-            save_tif(greyImage, outFolder, colorNamesImage[i] + "_gray");
+            ImagePlus greyImage = ImageChanger.toGrey(rgbImage);
+            ImageChanger.save_tif(greyImage, outFolder, colorNamesImage[i] + "_gray");
         }
     }
 
 
-    public static void videoAnalysis(ImagePlus image, Path outFolder) {
-        log("Starting video analysis...");
+    public void videoAnalysis(ImagePlus image, Path outFolder) {
+        Logger.log("Starting video analysis...");
 
         // function for video analysis
         ImagePlus[] rgbs = commonAnalysisSteps(image);
@@ -162,19 +79,19 @@ public class Stepwise_Analyzer implements PlugIn {
         frameDialog.dispose();
 
         // Save merge
-        ImagePlus composite = mergeRGB(rgbs);
-        save_avi(composite, outFolder, "Merge", fps);
+        ImagePlus composite = ImageChanger.mergeRGB(rgbs);
+        ImageChanger.save_avi(composite, outFolder, "Merge", fps);
 
         // Save single files
         String[] colorNamesVideo = {"TMR", "GFP", "Hoechst", "Ph2"};
         for (int i = 0; i < rgbs.length; i++) {
-            save_avi(rgbs[i], outFolder, colorNamesVideo[i], fps);
+            ImageChanger.save_avi(rgbs[i], outFolder, colorNamesVideo[i], fps);
         }
     }
 
 
-    public static void zStackAnalysis(ImagePlus image, Path outFolder) {
-        log("Starting z-stack analysis...");
+    public void zStackAnalysis(ImagePlus image, Path outFolder) {
+        Logger.log("Starting z-stack analysis...");
 
         String[] projectionTypes = {"Z Project", "3D Project", "Select Z-level"};
         GenericDialog stackDialog = new GenericDialog("How should the stack be projected ?");
@@ -182,13 +99,13 @@ public class Stepwise_Analyzer implements PlugIn {
         stackDialog.showDialog();
         String projectionType = stackDialog.getNextChoice();
         stackDialog.dispose();
-        log("Selected projection type: " + projectionType);
+        Logger.log("Selected projection type: " + projectionType);
 
         if (projectionType.equals("Select Z-level")) {
-            image = adjustBrightnessContrast(image);
-            image = cropImage(image);
-            image = makeSubstack(image);
-            image = addScaleBar(image);
+            image = ImageChanger.adjustBrightnessContrast(image);
+            image = ImageChanger.crop(image);
+            image = ImageChanger.makeSubstack(image);
+            image = ImageChanger.addScaleBar(image);
 
             imageAnalysis(image, outFolder, false);
         }
@@ -198,25 +115,24 @@ public class Stepwise_Analyzer implements PlugIn {
 
             for (int i = 0; i < rgbs.length; i++) {
                 ImagePlus rgbImage = rgbs[i];
-                setCurrentImage(rgbImage);
+                ImageChanger.setCurrentImage(rgbImage);
 
                 if (projectionType.equals("Z Project")) {
                     rgbs[i] = ZProjector.run(rgbImage, "max");
                 }
                 else if (projectionType.equals("3D Project")) {
-                    rgbs[i] = project3D(rgbImage);
+                    rgbs[i] = ImageChanger.project3D(rgbImage);
                 }
             }
 
-
             // Save merge & individual colors
-            ImagePlus composite = mergeRGB(rgbs);
+            ImagePlus composite = ImageChanger.mergeRGB(rgbs);
             String[] colorNames = {"TMR", "GFP", "Hoechst", "Ph2"};
             if (projectionType.equals("Z Project")) {
-                save_tif(composite, outFolder, "Merge");
+                ImageChanger.save_tif(composite, outFolder, "Merge");
 
                 for (int i = 0; i < rgbs.length; i++) {
-                    save_tif(rgbs[i], outFolder, colorNames[i]);
+                    ImageChanger.save_tif(rgbs[i], outFolder, colorNames[i]);
                 }
             }
             else if (projectionType.equals("3D Project")) {
@@ -228,185 +144,46 @@ public class Stepwise_Analyzer implements PlugIn {
 
 
                 for (int i = 0; i < rgbs.length; i++) {
-                    save_avi(rgbs[i], outFolder, colorNames[i], fps);
+                    ImageChanger.save_avi(rgbs[i], outFolder, colorNames[i], fps);
                 }
 
-                save_avi(composite, outFolder, "Merge", fps);
+                ImageChanger.save_avi(composite, outFolder, "Merge", fps);
             }
         }
     }
 
+    public ImagePlus[] commonAnalysisSteps(ImagePlus image) {
+        Logger.log("Starting common analysis steps...");
 
-    //	PRINCIPAL HELPER FUNCTIONS  //
-
-    public static void waitUntilClose(Window window) {
-        final Object lock = new Object();
-
-        window.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosed(WindowEvent e) {
-                synchronized (lock) {
-                    lock.notifyAll();
-                }
-            }
-        });
-
-        synchronized (lock) {
-            try {
-                lock.wait();
-            } catch (InterruptedException ignore) {
-            }
-        }
+        image = ImageChanger.adjustBrightnessContrast(image);
+        image = ImageChanger.crop(image);
+        image = ImageChanger.addScaleBar(image);
+        return ImageChanger.separateRGB(image);
     }
 
+    //
+    // Runner methods
+    //
 
-    public static void setCurrentImage(ImagePlus image) {
-        log("Setting current image to: " + image.getTitle());
-        WindowManager.setCurrentWindow(image.getWindow());
+    public static void main(String[] args) {
+        ImageJ ij = new ImageJ();
+        ij.ui().showUI();
+
+        (new Stepwise_Analyzer()).run("");
     }
 
-    public static ImagePlus adjustBrightnessContrast(ImagePlus image) {
-        setCurrentImage(image);
-        log("Adjusting Brightness & Contrast...");
+    public void run(String arg){
+        Logger.log("Starting run.");
+        Path inputDirectory = Paths.get( IJ.getDirectory("Choose input directory") ).normalize().toAbsolutePath();
+        Path outputDirectory = Paths.get( IJ.getDirectory("Choose output directory") ).normalize().toAbsolutePath();
+        String fileSuffix = IJ.getString("File suffix", ".nd2");
 
-        // Adjust Brightness/Contrast
-        ContrastAdjuster contrastAdjuster = new ContrastAdjuster();
-        contrastAdjuster.run("");
-        waitUntilClose(contrastAdjuster);
-
-        return IJ.getImage();
-    }
-
-    public static ImagePlus cropImage(ImagePlus image) {
-        setCurrentImage(image);
-        log("Cropping image...");
-
-        SpecifyROI_Interactively specifyRoiInteractively = new SpecifyROI_Interactively();
-        specifyRoiInteractively.runOnImage(image);
-
-        Resizer resizer = new Resizer();
-        resizer.run("crop");
-
-        return IJ.getImage();
-    }
-
-    public static ImagePlus addScaleBar(ImagePlus image) {
-        setCurrentImage(image);
-        log("Adding scale bar...");
-
-        ScaleBar scaleBar = new ScaleBar();
-        Macro.setOptions("width=10 height=5 thickness=5 font=0 hide overlay");
-        scaleBar.run("");
-        Macro.setOptions(null);
-
-        return IJ.getImage();
-    }
-
-    public static ImagePlus toRGB(ImagePlus image) {
-        if (!image.isComposite()) {
-            log("Converting image to RGB...");
-            RGBStackConverter.convertToRGB(image);
-        }
-        return image;
-    }
-
-    public static ImagePlus toGrey(ImagePlus image) {
-        log("Converting image to Grey...");
-
-        CompositeImage compositeImage = new CompositeImage(image);
-        compositeImage.setDisplayMode(IJ.GRAYSCALE);
-
-        return compositeImage;
-    }
-
-    public static ImagePlus[] separateRGB(ImagePlus image) {
-        log("Separating Red Green and Blue...");
-
-        ImagePlus[] splits = ChannelSplitter.split(image);
-
-        for (ImagePlus split : splits){
-            log("Showing split:" + split.getTitle());
-            split.show();
-        }
-
-        return splits;
-    }
+        Stepwise_Analyzer stepwiseAnalyzer = new Stepwise_Analyzer();
+        FileNavigator fileNavigator = new FileNavigator(stepwiseAnalyzer);
 
 
-    public static ImagePlus mergeRGB(ImagePlus[] rgb) {
-        log("Merging RGB Stack...");
-        RGBStackMerge rgbStackMerge = new RGBStackMerge();
-        ImagePlus composite = rgbStackMerge.mergeHyperstacks(rgb, true);
-
-        // TODO: only add RGB, excluding grayscale
-
-        log("Showing composite: " + composite.getTitle());
-        composite.show();
-
-        return addScaleBar(composite);
-    }
-
-    public static ImagePlus makeSubstack(ImagePlus image) {
-        setCurrentImage(image);
-        log("Making substack...");
-
-        SubstackMaker substackMaker = new SubstackMaker();
-        substackMaker.run("");
-        log("Substack created");
-
-        return IJ.getImage();
-    }
-
-    public static ImagePlus project3D(ImagePlus image) {
-        setCurrentImage(image);
-        log("3D projecting...");
-
-        Projector projector = new Projector();
-        Macro.setOptions("projection=[Brightest Point] axis=Y-Axis slice=0.20 initial=0 total=360 rotation=10 lower=1 upper=255 opacity=0 surface=100 interior=50 interpolate");
-        projector.run("");
-        Macro.setOptions(null);
-
-        return IJ.getImage();
-    }
-
-    public static ImagePlus[] commonAnalysisSteps(ImagePlus image) {
-        log("Starting common analysis steps...");
-
-        image = adjustBrightnessContrast(image);
-        image = cropImage(image);
-        image = addScaleBar(image);
-        return separateRGB(image);
-    }
-
-    /*
-     * SAVE Methods
-     */
-
-    public static void save_tif(ImagePlus image, Path outpath, String suffix) {
-        setCurrentImage(image);
-        log("Saving tif...");
-
-        image = image.flatten();
-
-        String fileName = image.getTitle() + "_" + suffix;
-        IJ.saveAs(image, "tif", outpath.resolve(fileName).toString() );
-        image.changes = false;
-        image.close();
-    }
-
-    public static void save_avi(ImagePlus image, Path outpath, String suffix, double frames) {
-        setCurrentImage(image);
-        log("Saving avi...");
-
-        AVI_Writer writer = new AVI_Writer();
-
-        String filePath = outpath.resolve(image.getTitle() + "_" + suffix + ".avi").toString();
-
-        Macro.setOptions("compression=JPEG frame="+ frames + " save="+ filePath);
-        writer.run(image.getProcessor());
-        Macro.setOptions(null);
-
-        image.close();
+        fileNavigator.processFolder(inputDirectory, outputDirectory, fileSuffix);
+        Logger.log("Run complete.");
     }
 
 }
