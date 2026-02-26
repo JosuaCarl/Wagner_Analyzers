@@ -19,19 +19,22 @@ public class Stepwise_AnalyzerTests {
         testSingleFile(Paths.get("src/test/resources/FluorescentCells.nd2").toAbsolutePath());
     }
 
-    private static boolean testSingleFile(Path inFile) throws IOException, FormatException {
-
+    private static ImagePlus[] bioImportImage(Path inFile) throws IOException, FormatException {
         // IJ.run("Bio-Formats Importer", "open=["+ inFile + "] color_mode=Default view=Hyperstack stack_order=XYCZT");
         LociImporter lociImporter = new LociImporter();
         Importer importer = new Importer(lociImporter);
-        ImporterOptions options = importer.parseOptions("open=[" + inFile.toString() + "] color_mode=Default view=Hyperstack stack_order=XYCZT");
+        ImporterOptions options = importer.parseOptions("open=[" + inFile.toString() + "] color_mode=Composite view=Hyperstack stack_order=XYCZT");
         ImportProcess importProcess = new ImportProcess(options);
         importProcess.execute();
         ImagePlusReader imagePlusReader = new ImagePlusReader(importProcess);
-        ImagePlus image = imagePlusReader.openImagePlus()[0];
+        return imagePlusReader.openImagePlus();
+    }
+
+    private static boolean testSingleFile(Path inFile) throws IOException, FormatException {
+        ImagePlus image = bioImportImage(inFile)[0];
         image.show();
 
-        Stepwise_Analyzer.processImage( image, Paths.get("out") );
+        Stepwise_Analyzer.processImage( image, Paths.get("src/test/resources/out").toAbsolutePath() );
 
         return true;
     }
