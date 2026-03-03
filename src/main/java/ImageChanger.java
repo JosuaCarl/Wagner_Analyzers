@@ -40,10 +40,11 @@ public class ImageChanger {
 
     public static ImagePlus addScaleBar(ImagePlus image) {
         setCurrentImage(image);
+        WindowManager.setTempCurrentImage(image);
         Logger.log("Adding scale bar...");
 
-        IJ.run(image, "Scale Bar...", "width=10 height=10 thickness=5 bold overlay");
-        Macro.setOptions(null);
+        ScaleBar scaleBar = new ScaleBar();
+        scaleBar.run("");
 
         return IJ.getImage();
     }
