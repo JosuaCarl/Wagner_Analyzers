@@ -5,6 +5,7 @@ import ij.plugin.*;
 
 import net.imagej.ImageJ;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -207,18 +208,45 @@ public class Stepwise_Analyzer implements PlugIn, ImageAnalyzer {
 
     public void run(String arg){
         Logger.log("Starting run.");
-        Path inputDirectory = Paths.get( IJ.getDirectory("Choose input directory") ).normalize().toAbsolutePath();
-        Path outputDirectory = Paths.get( IJ.getDirectory("Choose output directory") ).normalize().toAbsolutePath();
-        String fileSuffix = IJ.getString("File suffix", ".nd2");
+        GenericDialog dialog = new GenericDialog("Single file or folder processing");
+        dialog.addChoice("Processing type:", new String[]{"Single file", "Folder"}, "Folder");
+        dialog.showDialog();
+        String processingType = dialog.getNextChoice();
 
+        // Define Analyzer and Navigator
         Stepwise_Analyzer stepwiseAnalyzer = new Stepwise_Analyzer();
         stepwiseAnalyzer.defineDefaultRoi();
 
         FileNavigator fileNavigator = new FileNavigator(stepwiseAnalyzer);
 
+        // Collect input
+        Path inputPath;
+        Path outputDirectory;
+        String fileSuffix = null;
+        switch (processingType) {
+            case "Single file":
+                inputPath = Paths.get( IJ.getFilePath("Choose input file") ).normalize().toAbsolutePath();
+                outputDirectory = Paths.get( IJ.getDirectory("Choose output directory") ).normalize().toAbsolutePath();
 
-        fileNavigator.processFolder(inputDirectory, outputDirectory, fileSuffix);
+                try {
+                    fileNavigator.processFile(inputPath, outputDirectory, null);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                break;
+
+            case "Folder":
+                inputPath = Paths.get( IJ.getDirectory("Choose input directory") ).normalize().toAbsolutePath();
+                outputDirectory = Paths.get( IJ.getDirectory("Choose output directory") ).normalize().toAbsolutePath();
+                fileSuffix = IJ.getString("File suffix", ".nd2");
+
+                try {
+                    fileNavigator.processFolder(inputPath, outputDirectory, fileSuffix);
+                } catch (InterruptedException | IOException e) {
+                    throw new RuntimeException(e);
+                }
+                break;
+        }
         Logger.log("Run complete.");
     }
-
 }
